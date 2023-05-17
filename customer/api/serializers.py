@@ -4,6 +4,12 @@ from book.models import *
 from django.db import transaction
 
 
+class CustomerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CUSTOMER
+        fields = '__all__'
+
+
 class CustomerForBM2Serializer(serializers.ModelSerializer):
     class Meta:
         model = CUSTOMER
