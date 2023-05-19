@@ -61,3 +61,9 @@ class ConstraintForSettingSerializer(serializers.ModelSerializer):
     class Meta:
         model = CONSTRAINT
         fields = "__all__"
+
+
+class BookForQueryAmountSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BOOK
+        fields = ["Name"]

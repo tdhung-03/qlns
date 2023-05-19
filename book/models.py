@@ -19,7 +19,7 @@ class IMPORTLOG(models.Model):
     PrevAmount = models.IntegerField(default=0)
     Amount = models.IntegerField()
     UpdatedAmount = models.IntegerField(default=0)
-    TotalPrice = models.IntegerField()
+    TotalPrice = models.IntegerField(null=True, blank=True)
 
 
 class CONSTRAINT(models.Model):

@@ -38,6 +38,7 @@ class BillForBM2Serializer(serializers.ModelSerializer):
     def create(self, validated_data):
         customer_data = validated_data.pop("Customer")
         bill_details_data = validated_data.pop("BillDetails")
+        billdate = validated_data.get("BillDate")
         constraint = CONSTRAINT.objects.last()
         try:
             customer = CUSTOMER.objects.get(PhoneNumber=customer_data["PhoneNumber"])
@@ -58,8 +59,10 @@ class BillForBM2Serializer(serializers.ModelSerializer):
                 book = BOOK.objects.get(Name=book_name)
             except BOOK.DoesNotExist:
                 raise serializers.ValidationError(f"Book with name '{book_name}' does not exist.")
-            if book.Amount - amount_data < 20:
+            if book.Amount - amount_data < constraint.BookAmountAfter:
                 raise serializers.ValidationError(f"The quantity is very less")
+            IMPORTLOG.objects.create(ImportDate=billdate, Book=book, Amount=-amount_data,
+                                     PrevAmount=book.Amount, UpdatedAmount=book.Amount - amount_data)
             BILLDETAIL.objects.create(Bill=bill, Book=book, **bill_detail_data)
         for bill_detail in bill.BillDetails.all():
             book = bill_detail.Book
