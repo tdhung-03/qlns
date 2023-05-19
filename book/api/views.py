@@ -45,16 +45,3 @@ class BookList(generics.ListAPIView):
 class Setting(generics.ListCreateAPIView):
     queryset = CONSTRAINT.objects.all()
     serializer_class = ConstraintForSettingSerializer
-
-# class BookAmountsList(generics.ListAPIView):
-#     queryset = Book.objects.all()
-#     serializer_class = BookWithAmountsSerializer
-#
-#     def get_serializer_context(self):
-#         # Pass the month and year as context to the serializer
-#         context = super().get_serializer_context()
-#         context.update({
-#             "month": self.request.query_params.get("month"),
-#             "year": self.request.query_params.get("year")
-#         })
-#         return context
