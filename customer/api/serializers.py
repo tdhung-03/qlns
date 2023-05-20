@@ -64,6 +64,10 @@ class BillForBM2Serializer(serializers.ModelSerializer):
             IMPORTLOG.objects.create(ImportDate=billdate, Book=book, Amount=-amount_data,
                                      PrevAmount=book.Amount, UpdatedAmount=book.Amount - amount_data)
             BILLDETAIL.objects.create(Bill=bill, Book=book, **bill_detail_data)
+
+        DEBTLOG.objects.create(Customer=customer, DebtDate=billdate, Paid=-bill.Debt, PrevDebt=customer.Debt,
+                               UpdatedDebt=customer.Debt + bill.Debt)
+
         for bill_detail in bill.BillDetails.all():
             book = bill_detail.Book
             book.Amount -= bill_detail.Amount
@@ -119,3 +123,9 @@ class DebtLogForBM4Serializer(serializers.ModelSerializer):
     class Meta:
         model = DEBTLOG
         fields = ["Customer", "DebtDate", "Paid"]
+
+
+class CustomerForQueryDebtSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CUSTOMER
+        fields = ["PhoneNumber"]

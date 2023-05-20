@@ -6,4 +6,5 @@ urlpatterns = [
     path("debt-logs/", DebtLogList.as_view()),
     path("customers/", CustomerList.as_view()),
     path("customers/<str:PhoneNumber>/", CustomerDetail.as_view()),
+    path("customers-per-month/", CustomersPerMonth)
 ]
