@@ -54,7 +54,7 @@ class ImportLogForBM1Serializer(serializers.ModelSerializer):
 class BookForBM3Serializer(serializers.ModelSerializer):
     class Meta:
         model = BOOK
-        fields = ["Name", "Category", "Author", "Amount"]
+        fields = ["Name", "Category", "Author", "Amount", "ImportPrice"]
 
 
 class ConstraintForSettingSerializer(serializers.ModelSerializer):
