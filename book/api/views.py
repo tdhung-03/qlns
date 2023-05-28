@@ -7,7 +7,7 @@ from rest_framework import status
 import django_filters
 from django_filters import rest_framework
 import datetime
-from django.db.models import Sum, F, Case, When
+from django.db.models import Sum, F, Case, When, Min
 
 
 @api_view(['POST'])
@@ -58,9 +58,18 @@ def BooksPerMonth(request):
     first_day_of_month = datetime.date(year, month, 1)
 
     # Retrieve the latest ImportLog before the first day of the given month for each book
-    import_logs = IMPORTLOG.objects.filter(ImportDate__lt=first_day_of_month) \
+    import_logs_before_month = IMPORTLOG.objects.filter(ImportDate__lt=first_day_of_month) \
         .order_by('Book', '-ImportDate') \
         .distinct('Book')
+
+    # Retrieve the first ImportLog within the given month for each book
+    import_logs_within_month = IMPORTLOG.objects.filter(ImportDate__year=year, ImportDate__month=month) \
+        .exclude(ImportDate__lt=first_day_of_month) \
+        .order_by('Book', 'ImportDate') \
+        .distinct('Book')
+
+    # Combine the import logs from before the month and within the month
+    import_logs = import_logs_before_month | import_logs_within_month
 
     # Calculate the sum of the positive imports for each book in the specified month
     import_sums = IMPORTLOG.objects.filter(ImportDate__year=year, ImportDate__month=month) \
@@ -77,11 +86,37 @@ def BooksPerMonth(request):
         serializer = BookForQueryAmountSerializer(book)
         book_data = serializer.data
 
-        book_data['result_by_month'] = {
-            'FirstAmount': import_log.UpdatedAmount,
-            'ImportCount': import_sum_dict.get(book.id, 0),  # Get the import sum for the book
-            'LastAmount': import_log.UpdatedAmount + import_sum_dict.get(book.id, 0)
-        }
+        # Check if the import log is the first log within the given month
+        first_log_within_month = IMPORTLOG.objects.filter(Book=book, ImportDate__year=year, ImportDate__month=month) \
+            .aggregate(first_import=Min('ImportDate'))
+
+        if first_log_within_month['first_import'] == import_log.ImportDate:
+            # Set FirstAmount to 0 for the first import log within the given month
+            book_data['result_by_month'] = {
+                'FirstAmount': 0,
+                'ImportCount': import_sum_dict.get(book.id, 0),
+                'LastAmount': import_sum_dict.get(book.id, 0)
+            }
+        else:
+            # Retrieve the latest import log before the given month for the book
+            latest_log_before_month = IMPORTLOG.objects.filter(Book=book, ImportDate__lt=first_day_of_month) \
+                .order_by('-ImportDate') \
+                .first()
+
+            if latest_log_before_month:
+                # Calculate the FirstAmount using the latest import log before the given month
+                book_data['result_by_month'] = {
+                    'FirstAmount': latest_log_before_month.UpdatedAmount,
+                    'ImportCount': import_sum_dict.get(book.id, 0),
+                    'LastAmount': latest_log_before_month.UpdatedAmount + import_sum_dict.get(book.id, 0)
+                }
+            else:
+                # If there are no import logs before the given month, set FirstAmount to 0
+                book_data['result_by_month'] = {
+                    'FirstAmount': 0,
+                    'ImportCount': import_sum_dict.get(book.id, 0),
+                    'LastAmount': import_sum_dict.get(book.id, 0)
+                }
 
         books.append(book_data)
 
