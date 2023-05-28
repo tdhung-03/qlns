@@ -3,7 +3,7 @@ from customer.models import *
 from rest_framework import generics
 from rest_framework.decorators import api_view
 import datetime
-from django.db.models import Sum, F, Case, When
+from django.db.models import Sum, F, Case, When, Min
 from rest_framework.response import Response
 from rest_framework import status
 
@@ -38,9 +38,18 @@ def CustomersPerMonth(request):
     first_day_of_month = datetime.date(year, month, 1)
 
     # Retrieve the latest DebtLog before the first day of the given month for each customer
-    debt_logs = DEBTLOG.objects.filter(DebtDate__lt=first_day_of_month) \
+    debt_logs_before_month = DEBTLOG.objects.filter(DebtDate__lt=first_day_of_month) \
         .order_by('Customer', '-DebtDate') \
         .distinct('Customer')
+
+    # Retrieve the first DebtLog within the given month for each customer
+    debt_logs_within_month = DEBTLOG.objects.filter(DebtDate__year=year, DebtDate__month=month) \
+        .exclude(DebtDate__lt=first_day_of_month) \
+        .order_by('Customer', 'DebtDate') \
+        .distinct('Customer')
+
+    # Combine the debt logs from before the month and within the month
+    debt_logs = debt_logs_before_month | debt_logs_within_month
 
     # Calculate the sum of the negative debts for each customer in the specified month
     debt_sums = DEBTLOG.objects.filter(DebtDate__year=year, DebtDate__month=month) \
@@ -57,11 +66,37 @@ def CustomersPerMonth(request):
         serializer = CustomerForQueryDebtSerializer(customer)
         customer_data = serializer.data
 
-        customer_data['result_by_month'] = {
-            'FirstDebt': debt_log.UpdatedDebt,
-            'DebtSum': -debt_sum_dict.get(customer.id, 0),  # Get the debt sum for the customer
-            'LastDebt': debt_log.UpdatedDebt - debt_sum_dict.get(customer.id, 0)
-        }
+        # Check if the debt log is the first log within the given month
+        first_log_within_month = DEBTLOG.objects.filter(Customer=customer, DebtDate__year=year, DebtDate__month=month) \
+            .aggregate(first_debt=Min('DebtDate'))
+
+        if first_log_within_month['first_debt'] == debt_log.DebtDate:
+            # Set FirstDebt to 0 for the first debt log within the given month
+            customer_data['result_by_month'] = {
+                'FirstDebt': 0,
+                'DebtSum': -debt_sum_dict.get(customer.id, 0),
+                'LastDebt': -debt_sum_dict.get(customer.id, 0),
+            }
+        else:
+            # Retrieve the latest debt log before the given month for the customer
+            latest_log_before_month = DEBTLOG.objects.filter(Customer=customer, DebtDate__lt=first_day_of_month) \
+                .order_by('-DebtDate') \
+                .first()
+
+            if latest_log_before_month:
+                # Calculate the FirstDebt using the latest debt log before the given month
+                customer_data['result_by_month'] = {
+                    'FirstDebt': latest_log_before_month.UpdatedDebt,
+                    'DebtSum': -debt_sum_dict.get(customer.id, 0),
+                    'LastDebt': latest_log_before_month.UpdatedDebt - debt_sum_dict.get(customer.id, 0)
+                }
+            else:
+                # If there are no debt logs before the given month, set FirstDebt to 0
+                customer_data['result_by_month'] = {
+                    'FirstDebt': 0,
+                    'DebtSum': -debt_sum_dict.get(customer.id, 0),
+                    'LastDebt': -debt_sum_dict.get(customer.id, 0),
+                }
 
         customers.append(customer_data)
 
